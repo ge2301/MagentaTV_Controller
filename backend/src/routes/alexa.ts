@@ -111,14 +111,14 @@ export function createAlexaRoutes(manager: DeviceManager): Router {
         }
 
         case "ChannelUpIntent": {
-          const kc = resolveKeyCode("KEYCODE_CHANNEL_UP");
+          const kc = resolveKeyCode("KEYCODE_DPAD_UP");
           if (kc !== null) manager.sendKey(deviceId, kc, RemoteDirection.SHORT);
           res.json(alexaResponse("Nächster Kanal."));
           return;
         }
 
         case "ChannelDownIntent": {
-          const kc = resolveKeyCode("KEYCODE_CHANNEL_DOWN");
+          const kc = resolveKeyCode("KEYCODE_DPAD_DOWN");
           if (kc !== null) manager.sendKey(deviceId, kc, RemoteDirection.SHORT);
           res.json(alexaResponse("Vorheriger Kanal."));
           return;
