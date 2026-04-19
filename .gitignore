@@ -1,0 +1,34 @@
+node_modules/
+dist/
+dist-ssr/
+
+# Device data & settings (contains certs, device-specific config)
+backend/data/
+
+# Build artifacts
+*.local
+*.tsbuildinfo
+
+# Archives / backups
+*.7z
+*.zip
+*.tar.gz
+
+# Repo mirror folder
+repo/
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
