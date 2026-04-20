@@ -14,14 +14,20 @@ const APP_LINK_MAP: Record<string, string> = {
   prime: "https://app.primevideo.com",
   amazon: "https://app.primevideo.com",
   spotify: "spotify://",
-  zdf: "market://launch?id=com.zdf.android.mediathek",
-  "zdf mediathek": "market://launch?id=com.zdf.android.mediathek",
-  ard: "market://launch?id=de.ard.audiothek",
-  "ard mediathek": "market://launch?id=de.ard.audiothek",
-  magentatv: "market://launch?id=de.telekom.magentatv.androidtv",
-  magenta: "market://launch?id=de.telekom.magentatv.androidtv",
-  fernsehen: "market://launch?id=de.telekom.magentatv.androidtv",
-  "live tv": "market://launch?id=de.telekom.magentatv.androidtv",
+  zdf: "https://www.zdf.de",
+  "zdf mediathek": "https://www.zdf.de",
+  ard: "https://www.ardmediathek.de",
+  "ard mediathek": "https://www.ardmediathek.de",
+};
+
+// Apps without a known deep link need the HOME key followed by a DPAD-based
+// navigation approach, or we fall back to the KEYCODE_TV shortcut which opens
+// the live TV input on many Android TV devices.
+const SPECIAL_APP_KEYS: Record<string, string> = {
+  magentatv: "KEYCODE_TV",
+  magenta: "KEYCODE_TV",
+  fernsehen: "KEYCODE_TV",
+  "live tv": "KEYCODE_TV",
 };
 
 const DIRECTION_KEY_MAP: Record<string, string> = {
@@ -121,12 +127,19 @@ export function createAlexaRoutes(manager: DeviceManager): Router {
         case "LaunchAppIntent": {
           const appSlot = (intent.slots?.appName?.value ?? "").toLowerCase();
           const link = APP_LINK_MAP[appSlot];
-          if (!link) {
-            res.json(alexaResponse(`Ich kenne die App ${appSlot} nicht.`));
+          const specialKey = SPECIAL_APP_KEYS[appSlot];
+          if (link) {
+            manager.sendAppLink(deviceId, link);
+            res.json(alexaResponse(`${intent.slots.appName.value} wird gestartet.`));
             return;
           }
-          manager.sendAppLink(deviceId, link);
-          res.json(alexaResponse(`${intent.slots.appName.value} wird gestartet.`));
+          if (specialKey) {
+            const kc = resolveKeyCode(specialKey);
+            if (kc !== null) manager.sendKey(deviceId, kc, RemoteDirection.SHORT);
+            res.json(alexaResponse(`${intent.slots.appName.value} wird gestartet.`));
+            return;
+          }
+          res.json(alexaResponse(`Ich kenne die App ${appSlot} nicht.`));
           return;
         }
 
