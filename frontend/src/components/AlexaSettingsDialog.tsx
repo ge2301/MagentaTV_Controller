@@ -98,6 +98,30 @@ const INTERACTION_MODEL = JSON.stringify(
             samples: ["zurück", "geh zurück", "back"],
           },
           {
+            name: "ChannelNumberIntent",
+            slots: [{ name: "channelNumber", type: "AMAZON.NUMBER" }],
+            samples: [
+              "kanal {channelNumber}",
+              "programm {channelNumber}",
+              "wechsle auf kanal {channelNumber}",
+              "schalte auf {channelNumber}",
+              "sender {channelNumber}",
+            ],
+          },
+          {
+            name: "ChannelNameIntent",
+            slots: [{ name: "channelName", type: "CHANNEL_NAME" }],
+            samples: [
+              "schalte auf {channelName}",
+              "wechsle auf {channelName}",
+              "zeige {channelName}",
+              "{channelName}",
+              "schalte {channelName} ein",
+              "ich möchte {channelName} sehen",
+              "mach {channelName} an",
+            ],
+          },
+          {
             name: "SelectIntent",
             samples: [
               "auswählen",
@@ -151,6 +175,46 @@ const INTERACTION_MODEL = JSON.stringify(
             ],
           },
           {
+            name: "CHANNEL_NAME",
+            values: [
+              { name: { value: "ARD", synonyms: ["Das Erste", "Erstes"] } },
+              { name: { value: "ZDF" } },
+              { name: { value: "RTL" } },
+              { name: { value: "Sat 1", synonyms: ["Sat eins", "SAT.1"] } },
+              { name: { value: "Pro 7", synonyms: ["Pro Sieben", "ProSieben"] } },
+              { name: { value: "VOX" } },
+              { name: { value: "RTL 2", synonyms: ["RTL Zwei"] } },
+              { name: { value: "Kabel Eins", synonyms: ["Kabel 1"] } },
+              { name: { value: "Arte" } },
+              { name: { value: "3sat", synonyms: ["Drei Sat"] } },
+              { name: { value: "WDR" } },
+              { name: { value: "NDR" } },
+              { name: { value: "BR", synonyms: ["Bayerisches Fernsehen"] } },
+              { name: { value: "HR", synonyms: ["Hessischer Rundfunk"] } },
+              { name: { value: "MDR" } },
+              { name: { value: "SWR" } },
+              { name: { value: "RBB" } },
+              { name: { value: "Phoenix" } },
+              { name: { value: "Tagesschau 24" } },
+              { name: { value: "N-TV", synonyms: ["N TV", "NTV"] } },
+              { name: { value: "Welt", synonyms: ["Welt TV", "N24"] } },
+              { name: { value: "Sport 1", synonyms: ["Sport Eins"] } },
+              { name: { value: "Super RTL" } },
+              { name: { value: "KiKa", synonyms: ["Ki Ka", "Kinderkanal"] } },
+              { name: { value: "Tele 5", synonyms: ["Tele Fünf"] } },
+              { name: { value: "DMAX" } },
+              { name: { value: "Nitro", synonyms: ["RTL Nitro"] } },
+              { name: { value: "Sixx" } },
+              { name: { value: "Pro Sieben Maxx", synonyms: ["Pro 7 Maxx"] } },
+              { name: { value: "Sat 1 Gold" } },
+              { name: { value: "Disney Channel" } },
+              { name: { value: "Comedy Central" } },
+              { name: { value: "ZDF Neo" } },
+              { name: { value: "ZDF Info" } },
+              { name: { value: "One" } },
+            ],
+          },
+          {
             name: "DIRECTION",
             values: [
               {
@@ -171,7 +235,7 @@ const INTERACTION_MODEL = JSON.stringify(
   2,
 );
 
-type Tab = "config" | "guide";
+type Tab = "config" | "channels" | "guide";
 
 export function AlexaSettingsDialog({ open, onClose, devices }: Props) {
   const toast = useToast();
@@ -181,6 +245,9 @@ export function AlexaSettingsDialog({ open, onClose, devices }: Props) {
   const [deviceId, setDeviceId] = useState("");
   const [skillId, setSkillId] = useState("");
   const [tunnelUrl, setTunnelUrl] = useState("");
+  const [channelMap, setChannelMap] = useState<Record<string, string>>({});
+  const [newChName, setNewChName] = useState("");
+  const [newChNum, setNewChNum] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -195,6 +262,7 @@ export function AlexaSettingsDialog({ open, onClose, devices }: Props) {
         setDeviceId(s.deviceId);
         setSkillId(s.skillId ?? "");
         setTunnelUrl(s.tunnelUrl ?? "");
+        setChannelMap(s.channelMap ?? {});
       })
       .catch(() => {})
       .finally(() => setLoading(false));
@@ -215,6 +283,7 @@ export function AlexaSettingsDialog({ open, onClose, devices }: Props) {
         deviceId,
         skillId: skillId || undefined,
         tunnelUrl: tunnelUrl || undefined,
+        channelMap,
       });
       toast.show("Alexa settings saved", "success");
       onClose();
@@ -224,6 +293,33 @@ export function AlexaSettingsDialog({ open, onClose, devices }: Props) {
       );
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleAddChannel = () => {
+    const name = newChName.trim().toLowerCase();
+    const num = newChNum.trim();
+    if (!name || !num || !/^\d+$/.test(num)) return;
+    setChannelMap((prev) => ({ ...prev, [name]: num }));
+    setNewChName("");
+    setNewChNum("");
+  };
+
+  const handleRemoveChannel = (name: string) => {
+    setChannelMap((prev) => {
+      const next = { ...prev };
+      delete next[name];
+      return next;
+    });
+  };
+
+  const handleResetChannels = async () => {
+    try {
+      const defaults = await api.getDefaultChannelMap();
+      setChannelMap(defaults);
+      toast.show("Channel map reset to defaults", "info");
+    } catch {
+      toast.show("Failed to load defaults");
     }
   };
 
@@ -262,26 +358,19 @@ export function AlexaSettingsDialog({ open, onClose, devices }: Props) {
 
         {/* Tabs */}
         <div className="flex gap-1 mx-6 mt-4 p-1 rounded-xl bg-white/5 shrink-0">
-          <button
-            onClick={() => setTab("config")}
-            className={`flex-1 py-2 text-sm font-medium rounded-lg transition-all ${
-              tab === "config"
-                ? "bg-white/10 text-white"
-                : "text-white/40 hover:text-white/60"
-            }`}
-          >
-            Configuration
-          </button>
-          <button
-            onClick={() => setTab("guide")}
-            className={`flex-1 py-2 text-sm font-medium rounded-lg transition-all ${
-              tab === "guide"
-                ? "bg-white/10 text-white"
-                : "text-white/40 hover:text-white/60"
-            }`}
-          >
-            Setup Guide
-          </button>
+          {(["config", "channels", "guide"] as const).map((t) => (
+            <button
+              key={t}
+              onClick={() => setTab(t)}
+              className={`flex-1 py-2 text-sm font-medium rounded-lg transition-all ${
+                tab === t
+                  ? "bg-white/10 text-white"
+                  : "text-white/40 hover:text-white/60"
+              }`}
+            >
+              {t === "config" ? "Config" : t === "channels" ? "Channels" : "Guide"}
+            </button>
+          ))}
         </div>
 
         {/* Body */}
@@ -392,6 +481,89 @@ export function AlexaSettingsDialog({ open, onClose, devices }: Props) {
                 className="w-full py-2.5 rounded-xl bg-magenta-500 hover:bg-magenta-600 disabled:opacity-40 text-white font-medium transition-colors"
               >
                 {saving ? "Saving..." : "Save Settings"}
+              </button>
+            </div>
+          ) : tab === "channels" ? (
+            /* Channels Tab */
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <p className="text-sm text-white/50">
+                  {Object.keys(channelMap).length} Sender konfiguriert
+                </p>
+                <button
+                  onClick={handleResetChannels}
+                  className="px-3 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-xs text-white/40 hover:text-white/60 transition-all"
+                >
+                  Reset to Defaults
+                </button>
+              </div>
+
+              {/* Add new channel */}
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={newChName}
+                  onChange={(e) => setNewChName(e.target.value)}
+                  placeholder="Sendername (z.B. RTL)"
+                  className="flex-1 px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-white text-sm placeholder-white/20 focus:outline-none focus:border-magenta-500/50"
+                  onKeyDown={(e) => e.key === "Enter" && handleAddChannel()}
+                />
+                <input
+                  type="text"
+                  value={newChNum}
+                  onChange={(e) => setNewChNum(e.target.value)}
+                  placeholder="Nr."
+                  className="w-16 px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-white text-sm text-center placeholder-white/20 focus:outline-none focus:border-magenta-500/50"
+                  onKeyDown={(e) => e.key === "Enter" && handleAddChannel()}
+                />
+                <button
+                  onClick={handleAddChannel}
+                  disabled={!newChName.trim() || !newChNum.trim()}
+                  className="px-3 py-2 rounded-xl bg-magenta-500 hover:bg-magenta-600 disabled:opacity-30 text-white text-sm font-medium transition-colors"
+                >
+                  +
+                </button>
+              </div>
+
+              {/* Channel list */}
+              <div className="space-y-1 max-h-64 overflow-y-auto">
+                {Object.entries(channelMap)
+                  .sort(([, a], [, b]) => parseInt(a) - parseInt(b))
+                  .map(([name, num]) => (
+                    <div
+                      key={name}
+                      className="flex items-center justify-between px-3 py-2 rounded-lg bg-white/5 group"
+                    >
+                      <div className="flex items-center gap-3">
+                        <span className="text-xs text-white/30 w-8 text-right font-mono">
+                          {num}
+                        </span>
+                        <span className="text-sm text-white/70">{name}</span>
+                      </div>
+                      <button
+                        onClick={() => handleRemoveChannel(name)}
+                        className="opacity-0 group-hover:opacity-100 text-white/30 hover:text-red-400 transition-all"
+                      >
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    </div>
+                  ))}
+              </div>
+
+              <p className="text-xs text-white/30">
+                Sendernamen werden kleingeschrieben gespeichert. Die Nummern entsprechen deiner MagentaTV-Senderliste.
+                Passe die Nummern an dein Gerät an.
+              </p>
+
+              {/* Save button */}
+              <button
+                onClick={handleSave}
+                disabled={saving}
+                className="w-full py-2.5 rounded-xl bg-magenta-500 hover:bg-magenta-600 disabled:opacity-40 text-white font-medium transition-colors"
+              >
+                {saving ? "Saving..." : "Save Channels"}
               </button>
             </div>
           ) : (

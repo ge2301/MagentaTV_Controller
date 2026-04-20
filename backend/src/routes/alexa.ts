@@ -34,6 +34,26 @@ const DIRECTION_KEY_MAP: Record<string, string> = {
   rechts: "KEYCODE_DPAD_RIGHT",
 };
 
+const DIGIT_DELAY_MS = 200;
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((r) => setTimeout(r, ms));
+}
+
+async function sendDigits(
+  manager: DeviceManager,
+  deviceId: string,
+  digits: string,
+): Promise<void> {
+  for (let i = 0; i < digits.length; i++) {
+    const kc = resolveKeyCode(`KEYCODE_${digits[i]}`);
+    if (kc !== null) {
+      manager.sendKey(deviceId, kc, RemoteDirection.SHORT);
+      if (i < digits.length - 1) await sleep(DIGIT_DELAY_MS);
+    }
+  }
+}
+
 function alexaResponse(speechText: string, endSession = true) {
   return {
     version: "1.0",
@@ -124,6 +144,34 @@ export function createAlexaRoutes(manager: DeviceManager): Router {
           return;
         }
 
+        case "ChannelNumberIntent": {
+          const num = intent.slots?.channelNumber?.value;
+          if (!num || !/^\d+$/.test(String(num))) {
+            res.json(alexaResponse("Ich habe die Kanalnummer nicht verstanden."));
+            return;
+          }
+          await sendDigits(manager, deviceId, String(num));
+          res.json(alexaResponse(`Kanal ${num}.`));
+          return;
+        }
+
+        case "ChannelNameIntent": {
+          const name = (intent.slots?.channelName?.value ?? "").toLowerCase().trim();
+          if (!name) {
+            res.json(alexaResponse("Ich habe den Sendernamen nicht verstanden."));
+            return;
+          }
+          const channelMap = settings.channelMap ?? {};
+          const channelNum = channelMap[name];
+          if (!channelNum) {
+            res.json(alexaResponse(`Ich kenne den Sender ${intent.slots.channelName.value} nicht. Du kannst die Senderliste in den Einstellungen anpassen.`));
+            return;
+          }
+          await sendDigits(manager, deviceId, channelNum);
+          res.json(alexaResponse(`${intent.slots.channelName.value}.`));
+          return;
+        }
+
         case "VolumeUpIntent": {
           const kc = resolveKeyCode("KEYCODE_VOLUME_UP");
           if (kc !== null) manager.sendKey(deviceId, kc, RemoteDirection.SHORT);
@@ -194,7 +242,7 @@ export function createAlexaRoutes(manager: DeviceManager): Router {
 
         case "AMAZON.HelpIntent": {
           res.json(alexaResponse(
-            "Du kannst sagen: starte Netflix, nächster Kanal, lauter, leiser, pause, oder einschalten.",
+            "Du kannst sagen: starte Netflix, Kanal 5, schalte auf ARD, nächster Kanal, lauter, leiser, pause, oder einschalten.",
             false,
           ));
           return;

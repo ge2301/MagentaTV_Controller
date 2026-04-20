@@ -65,6 +65,7 @@ export const api = {
       deviceId: string;
       skillId?: string;
       tunnelUrl?: string;
+      channelMap?: Record<string, string>;
     }>("/settings/alexa");
   },
 
@@ -73,15 +74,21 @@ export const api = {
     deviceId: string;
     skillId?: string;
     tunnelUrl?: string;
+    channelMap?: Record<string, string>;
   }) {
     return request<{
       enabled: boolean;
       deviceId: string;
       skillId?: string;
       tunnelUrl?: string;
+      channelMap?: Record<string, string>;
     }>("/settings/alexa", {
       method: "PUT",
       body: JSON.stringify(settings),
     });
+  },
+
+  getDefaultChannelMap() {
+    return request<Record<string, string>>("/settings/alexa/channels/defaults");
   },
 };
